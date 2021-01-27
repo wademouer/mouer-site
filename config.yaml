@@ -1,0 +1,58 @@
+baseURL: https://example.com
+languageCode: en
+DefaultContentLanguage: en
+title: Website of Wade Mouer
+theme: anatole
+summarylength: 10
+enableEmoji: yes
+enableRobotsTXT: yes
+pygmentsUseClasses: yes
+pygmentsCodeFences: yes
+pygmentsCodefencesGuessSyntax: yes
+params:
+  author: Wade Mouer
+  customCss: []
+  customJs: []
+  description: M.S. Candidate in Analytics
+  doNotLoadAnimations: no
+  favicon: favicons/
+  images: images/site-feature-image.png
+  keywords: ''
+  mainSections: post
+  math:
+    enable: no
+    use: katex
+  profilePicture: images/profpic.jpg
+  simpleAnalytics: {}
+  socialIcons:
+    - icon: fab fa-linkedin
+      title: Linkedin
+      url: https://www.linkedin.com/in/wademouer
+    - icon: fab fa-github
+      title: GitHub
+      url: https://github.com/wademouer
+    # - icon: fab fa-instagram
+    #   title: instagram
+    #   url: https://www.instagram.com/
+    - icon: fas fa-envelope
+      title: e-mail
+      url: mailto:swmouer@ncsu.edu
+  title: Wade Mouer
+menu:
+  main:
+    - identifier: home
+      name: Home
+      url: /
+      weight: 100
+    - identifier: posts
+      name: Posts
+      url: /post/
+      weight: 200
+    - identifier: about
+      name: About
+      url: /about/
+      weight: 300
+    - identifier: contact
+      name: Contact
+      url: /contact/
+      weight: 400
