@@ -1,7 +1,7 @@
 ---
 title: Parks and Recreation Sentiment App
 author: Wade Mouer
-date: '2021-01-27'
+date: '2021-01-29'
 slug: []
 categories: []
 tags: []
@@ -12,9 +12,433 @@ DisableComments: no
 ---
 
 <script src="{{< blogdown/postref >}}index_files/header-attrs/header-attrs.js"></script>
+<script src="{{< blogdown/postref >}}index_files/htmlwidgets/htmlwidgets.js"></script>
+<script src="{{< blogdown/postref >}}index_files/plotly-binding/plotly.js"></script>
+<script src="{{< blogdown/postref >}}index_files/typedarray/typedarray.min.js"></script>
+<script src="{{< blogdown/postref >}}index_files/jquery/jquery.min.js"></script>
+<link href="{{< blogdown/postref >}}index_files/crosstalk/css/crosstalk.css" rel="stylesheet" />
+<script src="{{< blogdown/postref >}}index_files/crosstalk/js/crosstalk.min.js"></script>
+<link href="{{< blogdown/postref >}}index_files/plotly-htmlwidgets-css/plotly-htmlwidgets.css" rel="stylesheet" />
+<script src="{{< blogdown/postref >}}index_files/plotly-main/plotly-latest.min.js"></script>
 
 
-<div id="parks-and-recreation" class="section level1">
-<h1>Parks and Recreation</h1>
-<p>Recently, I stumbled upon a data set containing every line of dialogue over the entire run of the NBC Sitcom <em>Parks and Recreation</em>. As a huge fan of the show, text analytics, and R Shiny, I knew I had to make a project out of it.</p>
+<p>Recently, I stumbled upon a data set containing every line of dialogue over the entire run of the NBC Sitcom <em>Parks and Recreation</em>. As a huge fan of the show, text analytics, and R Shiny, I knew I had to make a project out of it. If you have not already, please check out the completed version of the app <a href="https://wmouer.shinyapps.io/ParksSentiment/">here</a>. I know the layout and display could be wonky on some screens, so hopefully things render okay. Below is a screenshot of what the app <em>should</em> look like.
+<img src="parksapp.png" alt="app" /></p>
+<div id="overview" class="section level2">
+<h2>Overview</h2>
+<p>This project consisted of three main phases. The first phase consisted of data wrangling and transformation. In the second phase, the app components and visuals were developed separately, and defined in such a way that would allow for dynamic filtering when used in the app. Finally, the components were put together and organized into a Shiny app. This process in reality was highly iterative, and consisted of several failures and scrapped ideas. In this write-up the process will be straightforward and an instant success.</p>
+</div>
+<div id="data-wrangling" class="section level2">
+<h2>Data Wrangling</h2>
+<p>The data wrangling in this project took two forms: the first was the dialogue data from the show, and the second was data scraped from the IMDB web page to provide further context.</p>
+<div id="dialogue-data" class="section level3">
+<h3>Dialogue Data</h3>
+<p>The main data for this project was found on <a href="https://www.kaggle.com/heheheluke/parks-and-recreation-scripts">Kaggle</a>, and consisted of individual <code>*.csv</code> files for the lines in each episode.</p>
+<pre class="r"><code>library(tidyverse)
+library(textdata)
+library(tidytext)
+library(stringr)
+library(plotly)
+library(rvest)
+
+episode1 &lt;- read_csv(&#39;scripts/s1e01.csv&#39;)</code></pre>
+<pre class="r"><code>head(episode1) %&gt;% kable()</code></pre>
+<table>
+<colgroup>
+<col width="7%" />
+<col width="92%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="left">Character</th>
+<th align="left">Line</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">Leslie Knope</td>
+<td align="left">Hello.</td>
+</tr>
+<tr class="even">
+<td align="left">Leslie Knope</td>
+<td align="left">Hi.</td>
+</tr>
+<tr class="odd">
+<td align="left">Leslie Knope</td>
+<td align="left">My name is Leslie Knope, and I work for the Parks and Recreation Department.</td>
+</tr>
+<tr class="even">
+<td align="left">Leslie Knope</td>
+<td align="left">Can I ask you a few questions?</td>
+</tr>
+<tr class="odd">
+<td align="left">Leslie Knope</td>
+<td align="left">Would you say that you are, “Enjoying yourself and having fun, having a moderate amount of fun and somewhat enjoying yourself, or having no fun and no enjoyment?”</td>
+</tr>
+<tr class="even">
+<td align="left">Leslie Knope</td>
+<td align="left">I’m gonna put a lot of fun.</td>
+</tr>
+</tbody>
+</table>
+<p>Thankfully, the naming of the 122 <code>*.csv</code> files was straightforward, for example <code>s1e01.csv</code>. This made it simple to loop through the folder of data files to build one data frame.</p>
+<pre class="r"><code>seasons = 1:7
+episodes = c(6,24, 16, 22,22,20,12)
+all_eps = data.frame()
+overall_ep = 0
+
+for(sn in seasons){
+  for(ep in 1:episodes[sn]){
+    eps = paste(ep)
+    if(ep &lt; 10) eps = paste(&#39;0&#39;, ep, sep = &#39;&#39;)
+    df &lt;- read_csv(paste(&#39;scripts/s&#39;, sn, &#39;e&#39;, eps, &#39;.csv&#39;, sep = &#39;&#39;))
+    overall_ep = overall_ep + 1
+    all_eps = rbind(all_eps, cbind(df, &#39;Season&#39; = sn, &#39;Episode&#39; = ep, &#39;Overall_Episode&#39; = overall_ep))
+  }
+}</code></pre>
+<p>At this point, we have a data frame like the one above, but for all episodes. This data frame also contains <code>Season</code>, <code>Episode</code>, and <code>Overall_Episode</code>. Here’s a look at the start of Season 3.</p>
+<pre class="r"><code>all_eps %&gt;% filter(Season == 2) %&gt;% head() %&gt;% kable()</code></pre>
+<table>
+<colgroup>
+<col width="6%" />
+<col width="77%" />
+<col width="3%" />
+<col width="4%" />
+<col width="8%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="left">Character</th>
+<th align="left">Line</th>
+<th align="right">Season</th>
+<th align="right">Episode</th>
+<th align="right">Overall_Episode</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">Ron Swanson</td>
+<td align="left">Okay, here’s the situation.</td>
+<td align="right">2</td>
+<td align="right">1</td>
+<td align="right">7</td>
+</tr>
+<tr class="even">
+<td align="left">Leslie Knope</td>
+<td align="left">Your parents went away on a week’s vacation.</td>
+<td align="right">2</td>
+<td align="right">1</td>
+<td align="right">7</td>
+</tr>
+<tr class="odd">
+<td align="left">Leslie Knope</td>
+<td align="left">They left the keys to the brand new Porsche.</td>
+<td align="right">2</td>
+<td align="right">1</td>
+<td align="right">7</td>
+</tr>
+<tr class="even">
+<td align="left">Leslie Knope</td>
+<td align="left">Would they mind?</td>
+<td align="right">2</td>
+<td align="right">1</td>
+<td align="right">7</td>
+</tr>
+<tr class="odd">
+<td align="left">Leslie Knope</td>
+<td align="left">Well, of course not.</td>
+<td align="right">2</td>
+<td align="right">1</td>
+<td align="right">7</td>
+</tr>
+<tr class="even">
+<td align="left">Leslie Knope</td>
+<td align="left">I’ll just take it for a little spin And maybe show it off to a couple of friends I’ll just cruise around the neighborhood Well, maybe I shouldn’t Yeah!</td>
+<td align="right">2</td>
+<td align="right">1</td>
+<td align="right">7</td>
+</tr>
+</tbody>
+</table>
+<p>After this step, I had to make some manual adjustments to the data. In Season 6, the season opener and the season finale were both two part episodes. In the data sets, they are treated as single episodes, but we want to consider them split apart. This would keep episode length generally standardized and make it match the representation on IMDB. To do this, I found the lines that showed the episode breaks and then manually adjusted the episode number numbers for the following episodes.</p>
+<pre class="r"><code>s6e1break = 48735
+s6e21break = 58963
+s7break = 59365
+end_line = 65942
+  
+all_eps[s6e1break:end_line,5] = all_eps[s6e1break:end_line,5] + 1 #change overall episode numbers
+all_eps[s6e21break:end_line, 5] = all_eps[s6e21break:end_line, 5] + 1
+
+all_eps[s6e1break:s7break,4] = all_eps[s6e1break:s7break,4] + 1 #change episode numbers in season 6
+all_eps[s6e21break:s7break,4] = all_eps[s6e21break:s7break,4] + 1
+
+episodes = c(6,24, 16, 22,22,22,12)
+
+all_eps %&gt;% group_by(Season) %&gt;% summarise(num_episodes = n_distinct(Episode)) %&gt;% kable()
+## `summarise()` ungrouping output (override with `.groups` argument)</code></pre>
+<table>
+<thead>
+<tr class="header">
+<th align="right">Season</th>
+<th align="right">num_episodes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">1</td>
+<td align="right">6</td>
+</tr>
+<tr class="even">
+<td align="right">2</td>
+<td align="right">24</td>
+</tr>
+<tr class="odd">
+<td align="right">3</td>
+<td align="right">16</td>
+</tr>
+<tr class="even">
+<td align="right">4</td>
+<td align="right">22</td>
+</tr>
+<tr class="odd">
+<td align="right">5</td>
+<td align="right">22</td>
+</tr>
+<tr class="even">
+<td align="right">6</td>
+<td align="right">22</td>
+</tr>
+<tr class="odd">
+<td align="right">7</td>
+<td align="right">12</td>
+</tr>
+</tbody>
+</table>
+<p>The next step was to break apart the lines into the individual words, remove punctuation and convert the data frame to a more “tidy” format. This was done using <code>tidytext::unnest_tokens()</code>.</p>
+<pre class="r"><code>all_eps_tidy &lt;- all_eps %&gt;% 
+  group_by(Season, Episode) %&gt;% 
+  mutate(line_num = row_number()) %&gt;% 
+  ungroup() %&gt;% 
+  unnest_tokens(word, Line)</code></pre>
+<p>At this point, we have two data frames: <code>all_eps</code> and <code>all_eps_tidy</code>. The data frame <code>all_eps</code> will have more to do with the number of lines each character has, while <code>all_eps_tidy</code> will be more useful for determining sentiment.</p>
+</div>
+<div id="imdb-data" class="section level3">
+<h3>IMDB Data</h3>
+<p>Shifting gears slightly, I also wanted to incorporate some data from IMDB to go alongside the dialogue data and sentiment scoring. The most straightforward way of doing this was to scrape the IMDB website to pull out episode ratings, titles, and descriptions. On the IMDB website, the <em>Parks and Recreation</em> has a page that shows these three pieces of information for all episodes of a given season. Moreover, the season selection is simple to do by adjusting the url. These pieces of organization reduced the challenges of this task considerably.</p>
+<p>After some experimentation, I was able to isolate the tags within the web page that contained the desired information. My understanding of web development terms and technologies is very shaky, so my terminology might be somewhat off. Lets have a look at what happens when we pull information for Season 1, Episode 1.</p>
+<pre class="r"><code>page = read_html(&#39;https://www.imdb.com/title/tt1266020/episodes?season=1&#39;)
+text = html_text(html_nodes(page, &#39;.info&#39;))
+text[1]
+## [1] &quot;\n    \n            9 Apr. 2009\n    \n    Pilot\n    \n    \n        \n            \n        7.0\n            (2,786)\n    \n    \n        \n    \n        \n            \n        0\n    \n    \n        \n            \n        Rate\n    \n        \n    \n        \n            \n                            \n            \n            \n            \n                    \n    \n        \n            \n        1\n    \n    \n        \n            \n        Rate\n    \n                    \n                    \n    \n        \n            \n        2\n    \n    \n        \n            \n        Rate\n    \n                    \n                    \n    \n        \n            \n        3\n    \n    \n        \n            \n        Rate\n    \n                    \n                    \n    \n        \n            \n        4\n    \n    \n        \n            \n        Rate\n    \n                    \n                    \n    \n        \n            \n        5\n    \n    \n        \n            \n        Rate\n    \n                    \n                    \n    \n        \n            \n        6\n    \n    \n        \n            \n        Rate\n    \n                    \n                    \n    \n        \n            \n        7\n    \n    \n        \n            \n        Rate\n    \n                    \n                    \n    \n        \n            \n        8\n    \n    \n        \n            \n        Rate\n    \n                    \n                    \n    \n        \n            \n        9\n    \n    \n        \n            \n        Rate\n    \n                    \n                    \n    \n        \n            \n        10\n    \n    \n        \n            \n        Rate\n    \n                    \n                \n                    \n            \n            0\n        \n        \n            Error: please try again.\n        \n    \n        \n            \n    \n    \n    \n    In an attempt to beautify her town, Leslie Knope takes on the seemingly simple job of helping turn an abandoned construction pit into a park.    \n    \n  &quot;</code></pre>
+<p>Certainly looks like a disaster, but all the info we are looking for is in that data. If we trim the new lines and double spaces, it is much easier to read.</p>
+<pre class="r"><code>text &lt;- gsub(&#39;\n&#39;, &#39;&#39;, text)
+text &lt;- gsub(&#39;  &#39;, &#39;&#39;, text)
+text[1]
+## [1] &quot;9 Apr. 2009Pilot7.0(2,786)0Rate1Rate2Rate3Rate4Rate5Rate6Rate7Rate8Rate9Rate10Rate0Error: please try again.In an attempt to beautify her town, Leslie Knope takes on the seemingly simple job of helping turn an abandoned construction pit into a park.&quot;</code></pre>
+<p>Now, we can pick up on patterns and pull out information we want. The easiest is the description: for each episode the description follows the piece of text that says <code>'please try again. '</code>. The title and score are followed by an open parenthesis <code>(</code>, with the score occupying the last three characters of that section. Finally, the episode title follows the year of release, which takes the form <code>20XX</code>. Here’s what this looks like for the first episode.</p>
+<pre class="r"><code>descriptions &lt;- word(text, 2, sep = fixed(&#39;please try again.&#39;))
+ttl &lt;- word(text, 1, sep = fixed(&#39;(&#39;))
+scores &lt;- as.numeric(str_sub(ttl, -3,-1))
+titles &lt;- word(ttl, 2, sep = &#39;20\\d\\d&#39;) %&gt;% str_sub(1,-4)
+titles[1]
+## [1] &quot;Pilot&quot;
+scores[1]
+## [1] 7
+descriptions[1]
+## [1] &quot;In an attempt to beautify her town, Leslie Knope takes on the seemingly simple job of helping turn an abandoned construction pit into a park.&quot;</code></pre>
+<p>Thankfully, each of those patterns remain consistent for each episode of each season, so these lines of code can be used to loop through the entire series of the show.</p>
+<pre class="r"><code>imdb_df = data.frame()
+
+for(sn in seasons){
+  page &lt;- read_html(paste(&#39;https://www.imdb.com/title/tt1266020/episodes?season=&#39;, sn, sep = &#39;&#39;))
+  nodes = html_nodes(page, &#39;.info&#39;)
+  text = html_text(nodes)
+  text &lt;- gsub(&#39;\n&#39;, &#39;&#39;, text)
+  text &lt;- gsub(&#39;  &#39;, &#39;&#39;, text)
+  descriptions &lt;- word(text, 2, sep = fixed(&#39;please try again.&#39;))
+  ttl &lt;- word(text, 1, sep = fixed(&#39;(&#39;))
+  scores &lt;- as.numeric(str_sub(ttl, -3,-1))
+  titles &lt;- word(ttl, 2, sep = &#39;20\\d\\d&#39;) %&gt;% str_sub(1,-4)
+  df &lt;- data.frame(&#39;Season&#39; = rep(sn, episodes[sn]), &#39;Episode&#39; = 1:episodes[sn], &#39;Title&#39; = titles, &#39;imdb_score&#39; = scores, &#39;description&#39; = descriptions)
+  imdb_df = rbind(imdb_df, df)
+}
+head(imdb_df) %&gt;% kable()</code></pre>
+<table>
+<colgroup>
+<col width="2%" />
+<col width="2%" />
+<col width="4%" />
+<col width="4%" />
+<col width="85%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="right">Season</th>
+<th align="right">Episode</th>
+<th align="left">Title</th>
+<th align="right">imdb_score</th>
+<th align="left">description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="right">1</td>
+<td align="right">1</td>
+<td align="left">Pilot</td>
+<td align="right">7.0</td>
+<td align="left">In an attempt to beautify her town, Leslie Knope takes on the seemingly simple job of helping turn an abandoned construction pit into a park.</td>
+</tr>
+<tr class="even">
+<td align="right">1</td>
+<td align="right">2</td>
+<td align="left">Canvassing</td>
+<td align="right">7.1</td>
+<td align="left">Leslie gets a town hall meeting to discuss her park idea, but she finds out that public reception is less than receptive.</td>
+</tr>
+<tr class="odd">
+<td align="right">1</td>
+<td align="right">3</td>
+<td align="left">The Reporter</td>
+<td align="right">7.2</td>
+<td align="left">Leslie gets a newspaper reporter to do a story about her and the park idea, but becomes upset when she finds out that the reporter slept with Mark.</td>
+</tr>
+<tr class="even">
+<td align="right">1</td>
+<td align="right">4</td>
+<td align="left">Boys’ Club</td>
+<td align="right">7.4</td>
+<td align="left">Leslie tries to infiltrate the boys’ club of politics by crashing an after-work gathering at the town hall. Trying to fit in, she opens a gift basket breaking the local government ethics, and then is called before an ethics committee.</td>
+</tr>
+<tr class="odd">
+<td align="right">1</td>
+<td align="right">5</td>
+<td align="left">The Banquet</td>
+<td align="right">7.2</td>
+<td align="left">At a banquet honouring her mother, Leslie tries to convince a local zoning official to support her park project. But sensing resistance, Lesie resorts to blackmail. Meanwhile, Tom and Mark ditch the festivities to hit the bars.</td>
+</tr>
+<tr class="even">
+<td align="right">1</td>
+<td align="right">6</td>
+<td align="left">Rock Show</td>
+<td align="right">7.7</td>
+<td align="left">Leslie doesn’t realize that a dinner with a much older man from the zoning commission is actually a date set up by her mom. Andy gets his cast taken off, but Ann gets mad when she finds out it could have been off two weeks ago.</td>
+</tr>
+</tbody>
+</table>
+<p>Finally, we can join the IMDB data with the dialogue data to create our final data set. In this step, we also pull in the Bing Lexicon for sentiment analysis, to gauge the overall sentiment of each episode.</p>
+<pre class="r"><code>episode_data &lt;- all_eps_tidy %&gt;% 
+  inner_join(get_sentiments(&#39;bing&#39;)) %&gt;% 
+  count(Season, Episode, Overall_Episode, sentiment) %&gt;% 
+  pivot_wider(names_from = sentiment, values_from = n) %&gt;% 
+  mutate(sentiment = positive - negative)  %&gt;% 
+  inner_join(imdb_df, by = c(&#39;Season&#39;, &#39;Episode&#39;)) 
+## Joining, by = &quot;word&quot;</code></pre>
+<p>When I looked through the data frame, I noticed one small bug from the next-to-last section of code: season 7, episode 1 was missing its title. The score and description were there, but the title was a blank string. When I looked up the title of that episode, I found that it was <em>2017</em>. This meant that the code meant to trim away the episode release date had trimmed away the title as well. Since it was only a problem for one data point, I just corrected it manually.</p>
+<pre class="r"><code>episode_data$Title[113] = &#39;2017&#39; #This got lost in the string value trimming due to confusion with date</code></pre>
+</div>
+</div>
+<div id="visualization" class="section level2">
+<h2>Visualization</h2>
+<p>At this point, the heavy lifting of data manipulation was mostly done. The next steps were to come up with elements to show and how to show them. In this write-up, I will mostly focus on static graphs for a selected character. Showing options for a selected character/season. In the app itself, these graphs are dynamic and you can switch between characters and seasons to compare.</p>
+<div id="who-had-the-most-lines" class="section level3">
+<h3>Who had the most lines?</h3>
+<p>Those who watched the show would not need a graph to answer this one. It’s Leslie Knope. Nonetheless, I wanted to see how the breakdown of the show’s top speakers changed from season to season. For each of the graphs made, I wrapped them in functions with parameters to use for filtering (this was mostly to make things easier when calling them in the Shiny <code>server</code>).</p>
+<pre class="r"><code>line_share_lollipop &lt;- function(season){
+  all_eps %&gt;% 
+    filter(Season == season) %&gt;% 
+    group_by(Character) %&gt;%
+    summarise(line_count = n()) %&gt;%
+    ungroup() %&gt;% 
+    mutate(lineshare = line_count / sum(line_count)) %&gt;% 
+    arrange(desc(lineshare)) %&gt;% 
+    mutate(Character = factor(Character, levels = Character[order(lineshare)])) %&gt;% 
+    head(15) %&gt;% 
+    ggplot(aes(x = Character, y = lineshare)) +
+    geom_segment(aes(x = Character, xend = Character, y = 0, yend = lineshare), color =&quot;#264653&quot;) + 
+    geom_point(color = &quot;#264653&quot;, size = 3, alpha = .6)+
+    scale_y_continuous(labels = scales::percent)+
+    coord_flip() + 
+    labs(
+      title = paste(&#39;Percentage of Total Lines: Season&#39;, season),
+         x = &#39;&#39;,
+         y = &#39;&#39;) + theme_minimal()
+  #ggplotly() 
+}
+
+line_share_lollipop(3)
+## `summarise()` ungrouping output (override with `.groups` argument)</code></pre>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-3-1.png" width="100%" /></p>
+<p>So, in season 3, Leslie Knope had a whopping 25% of the lines spoken in the show, over twice the amount of the next-highest character.</p>
+</div>
+<div id="sentiment-full-series-run" class="section level3">
+<h3>Sentiment: Full Series Run</h3>
+<p>Next, I simply visualized the overall sentiment (calculated using the Bing Lexicon) of each episode over the entire run of the series. There were some interesting trends:</p>
+<pre class="r"><code>full_series_bar &lt;- function(){
+  episode_data %&gt;% 
+    mutate(Season = as.factor(Season)) %&gt;% 
+    ggplot(aes(fill = Season, label = Episode, x = Overall_Episode,  text = Title, y = sentiment )) + 
+    geom_col(show.legend = F) + 
+    labs(title = &#39;Overall Sentiment per Episode of Parks and Recreation&#39;,
+         x = &#39;Episode Number&#39;, 
+         y = &#39;Overall Sentiment&#39;)+
+    theme_minimal()
+  ggplotly(tooltip = c(&#39;text&#39;, &#39;fill&#39;, &#39;label&#39;, &#39;y&#39;))
+}
+full_series_bar()</code></pre>
+<div id="htmlwidget-1" style="width:100%;height:384px;" class="plotly html-widget"></div>
+<script type="application/json" data-for="htmlwidget-1">{"x":{"data":[{"orientation":"v","width":[0.9,0.9,0.9,0.9,0.9,0.9],"base":[0,0,0,0,0,0],"x":[1,2,3,4,5,6],"y":[106,83,62,34,122,51],"text":["sentiment: 106<br />Season: 1<br />Episode:  1<br />Pilot","sentiment:  83<br />Season: 1<br />Episode:  2<br />Canvassing","sentiment:  62<br />Season: 1<br />Episode:  3<br />The Reporter","sentiment:  34<br />Season: 1<br />Episode:  4<br />Boys' Club","sentiment: 122<br />Season: 1<br />Episode:  5<br />The Banquet","sentiment:  51<br />Season: 1<br />Episode:  6<br />Rock Show"],"type":"bar","marker":{"autocolorscale":false,"color":"rgba(248,118,109,1)","line":{"width":1.88976377952756,"color":"transparent"}},"name":"1","legendgroup":"1","showlegend":true,"xaxis":"x","yaxis":"y","hoverinfo":"text","frame":null},{"orientation":"v","width":[0.9,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999,0.899999999999999],"base":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"x":[7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30],"y":[112,61,137,53,87,22,49,30,97,54,66,91,113,103,76,88,136,55,29,92,30,66,111,83],"text":["sentiment: 112<br />Season: 2<br />Episode:  1<br />Pawnee Zoo","sentiment:  61<br />Season: 2<br />Episode:  2<br />The Stakeout","sentiment: 137<br />Season: 2<br />Episode:  3<br />Beauty Pageant","sentiment:  53<br />Season: 2<br />Episode:  4<br />Practice Date","sentiment:  87<br />Season: 2<br />Episode:  5<br />Sister City","sentiment:  22<br />Season: 2<br />Episode:  6<br />Kaboom","sentiment:  49<br />Season: 2<br />Episode:  7<br />Greg Pikitis","sentiment:  30<br />Season: 2<br />Episode:  8<br />Ron and Tammy","sentiment:  97<br />Season: 2<br />Episode:  9<br />The Camel","sentiment:  54<br />Season: 2<br />Episode: 10<br />Hunting Trip","sentiment:  66<br />Season: 2<br />Episode: 11<br />Tom's Divorce","sentiment:  91<br />Season: 2<br />Episode: 12<br />Christmas Scandal","sentiment: 113<br />Season: 2<br />Episode: 13<br />The Set Up","sentiment: 103<br />Season: 2<br />Episode: 14<br />Leslie's House","sentiment:  76<br />Season: 2<br />Episode: 15<br />Sweetums","sentiment:  88<br />Season: 2<br />Episode: 16<br />Galentine's Day","sentiment: 136<br />Season: 2<br />Episode: 17<br />Woman of the Year","sentiment:  55<br />Season: 2<br />Episode: 18<br />The Possum","sentiment:  29<br />Season: 2<br />Episode: 19<br />Park Safety","sentiment:  92<br />Season: 2<br />Episode: 20<br />Summer Catalog","sentiment:  30<br />Season: 2<br />Episode: 21<br />94 Meetings","sentiment:  66<br />Season: 2<br />Episode: 22<br />Telethon","sentiment: 111<br />Season: 2<br />Episode: 23<br />The Master Plan","sentiment:  83<br />Season: 2<br />Episode: 24<br />Freddy Spaghetti"],"type":"bar","marker":{"autocolorscale":false,"color":"rgba(196,154,0,1)","line":{"width":1.88976377952756,"color":"transparent"}},"name":"2","legendgroup":"2","showlegend":true,"xaxis":"x","yaxis":"y","hoverinfo":"text","frame":null},{"orientation":"v","width":[0.899999999999999,0.900000000000002,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006],"base":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"x":[31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46],"y":[122,32,94,45,65,37,17,108,108,100,97,75,32,119,55,94],"text":["sentiment: 122<br />Season: 3<br />Episode:  1<br />Go Big or Go Home","sentiment:  32<br />Season: 3<br />Episode:  2<br />Flu Season","sentiment:  94<br />Season: 3<br />Episode:  3<br />Time Capsule","sentiment:  45<br />Season: 3<br />Episode:  4<br />Ron & Tammy 2","sentiment:  65<br />Season: 3<br />Episode:  5<br />Media Blitz","sentiment:  37<br />Season: 3<br />Episode:  6<br />Indianapolis","sentiment:  17<br />Season: 3<br />Episode:  7<br />Harvest Festival","sentiment: 108<br />Season: 3<br />Episode:  8<br />Camping","sentiment: 108<br />Season: 3<br />Episode:  9<br />Fancy Party","sentiment: 100<br />Season: 3<br />Episode: 10<br />Soulmates","sentiment:  97<br />Season: 3<br />Episode: 11<br />Jerry's Painting","sentiment:  75<br />Season: 3<br />Episode: 12<br />Eagleton","sentiment:  32<br />Season: 3<br />Episode: 13<br />The Fight","sentiment: 119<br />Season: 3<br />Episode: 14<br />Road Trip","sentiment:  55<br />Season: 3<br />Episode: 15<br />The Bubble","sentiment:  94<br />Season: 3<br />Episode: 16<br />Li'l Sebastian"],"type":"bar","marker":{"autocolorscale":false,"color":"rgba(83,180,0,1)","line":{"width":1.88976377952756,"color":"transparent"}},"name":"3","legendgroup":"3","showlegend":true,"xaxis":"x","yaxis":"y","hoverinfo":"text","frame":null},{"orientation":"v","width":[0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006],"base":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"x":[47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68],"y":[51,51,45,103,54,113,95,47,27,108,78,117,112,78,124,49,72,83,69,72,45,79],"text":["sentiment:  51<br />Season: 4<br />Episode:  1<br />I'm Leslie Knope","sentiment:  51<br />Season: 4<br />Episode:  2<br />Ron and Tammys","sentiment:  45<br />Season: 4<br />Episode:  3<br />Born and Raised","sentiment: 103<br />Season: 4<br />Episode:  4<br />Pawnee Rangers","sentiment:  54<br />Season: 4<br />Episode:  5<br />Meet 'N' Greet","sentiment: 113<br />Season: 4<br />Episode:  6<br />End of the World","sentiment:  95<br />Season: 4<br />Episode:  7<br />The Treaty","sentiment:  47<br />Season: 4<br />Episode:  8<br />Smallest Park","sentiment:  27<br />Season: 4<br />Episode:  9<br />The Trial of Leslie Knope","sentiment: 108<br />Season: 4<br />Episode: 10<br />Citizen Knope","sentiment:  78<br />Season: 4<br />Episode: 11<br />The Comeback Kid","sentiment: 117<br />Season: 4<br />Episode: 12<br />Campaign Ad","sentiment: 112<br />Season: 4<br />Episode: 13<br />Bowling for Votes","sentiment:  78<br />Season: 4<br />Episode: 14<br />Operation Ann","sentiment: 124<br />Season: 4<br />Episode: 15<br />Dave Returns","sentiment:  49<br />Season: 4<br />Episode: 16<br />Sweet Sixteen","sentiment:  72<br />Season: 4<br />Episode: 17<br />Campaign Shake-Up","sentiment:  83<br />Season: 4<br />Episode: 18<br />Lucky","sentiment:  69<br />Season: 4<br />Episode: 19<br />Live Ammo","sentiment:  72<br />Season: 4<br />Episode: 20<br />The Debate","sentiment:  45<br />Season: 4<br />Episode: 21<br />Bus Tour","sentiment:  79<br />Season: 4<br />Episode: 22<br />Win, Lose or Draw"],"type":"bar","marker":{"autocolorscale":false,"color":"rgba(0,192,148,1)","line":{"width":1.88976377952756,"color":"transparent"}},"name":"4","legendgroup":"4","showlegend":true,"xaxis":"x","yaxis":"y","hoverinfo":"text","frame":null},{"orientation":"v","width":[0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006],"base":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"x":[69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90],"y":[97,43,93,97,41,133,89,64,118,73,56,82,17,59,82,54,69,53,110,72,87,89],"text":["sentiment:  97<br />Season: 5<br />Episode:  1<br />Ms. Knope Goes to Washington","sentiment:  43<br />Season: 5<br />Episode:  2<br />Soda Tax","sentiment:  93<br />Season: 5<br />Episode:  3<br />How a Bill Becomes a Law","sentiment:  97<br />Season: 5<br />Episode:  4<br />Sex Education","sentiment:  41<br />Season: 5<br />Episode:  5<br />Halloween Surprise","sentiment: 133<br />Season: 5<br />Episode:  6<br />Ben's Parents","sentiment:  89<br />Season: 5<br />Episode:  7<br />Leslie vs. April","sentiment:  64<br />Season: 5<br />Episode:  8<br />Pawnee Commons","sentiment: 118<br />Season: 5<br />Episode:  9<br />Ron and Diane","sentiment:  73<br />Season: 5<br />Episode: 10<br />Two Parties","sentiment:  56<br />Season: 5<br />Episode: 11<br />Women in Garbage","sentiment:  82<br />Season: 5<br />Episode: 12<br />Ann's Decision","sentiment:  17<br />Season: 5<br />Episode: 13<br />Emergency Response","sentiment:  59<br />Season: 5<br />Episode: 14<br />Leslie and Ben","sentiment:  82<br />Season: 5<br />Episode: 15<br />Correspondents' Lunch","sentiment:  54<br />Season: 5<br />Episode: 16<br />Bailout","sentiment:  69<br />Season: 5<br />Episode: 17<br />Partridge","sentiment:  53<br />Season: 5<br />Episode: 18<br />Animal Control","sentiment: 110<br />Season: 5<br />Episode: 19<br />Article Two","sentiment:  72<br />Season: 5<br />Episode: 20<br />Jerry's Retirement","sentiment:  87<br />Season: 5<br />Episode: 21<br />Swing Vote","sentiment:  89<br />Season: 5<br />Episode: 22<br />Are You Better Off?"],"type":"bar","marker":{"autocolorscale":false,"color":"rgba(0,182,235,1)","line":{"width":1.88976377952756,"color":"transparent"}},"name":"5","legendgroup":"5","showlegend":true,"xaxis":"x","yaxis":"y","hoverinfo":"text","frame":null},{"orientation":"v","width":[0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006],"base":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"x":[91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112],"y":[41,87,43,109,1,76,71,104,83,77,78,35,112,66,94,98,103,73,75,97,101,101],"text":["sentiment:  41<br />Season: 6<br />Episode:  1<br />London: Part 1","sentiment:  87<br />Season: 6<br />Episode:  2<br />London: Part 2","sentiment:  43<br />Season: 6<br />Episode:  3<br />The Pawnee-Eagleton Tip Off Classic","sentiment: 109<br />Season: 6<br />Episode:  4<br />Doppelgängers","sentiment:   1<br />Season: 6<br />Episode:  5<br />Gin It Up!","sentiment:  76<br />Season: 6<br />Episode:  6<br />Filibuster","sentiment:  71<br />Season: 6<br />Episode:  7<br />Recall Vote","sentiment: 104<br />Season: 6<br />Episode:  8<br />Fluoride","sentiment:  83<br />Season: 6<br />Episode:  9<br />The Cones of Dunshire","sentiment:  77<br />Season: 6<br />Episode: 10<br />Second Chunce","sentiment:  78<br />Season: 6<br />Episode: 11<br />New Beginnings","sentiment:  35<br />Season: 6<br />Episode: 12<br />Farmers Market","sentiment: 112<br />Season: 6<br />Episode: 13<br />Ann and Chris","sentiment:  66<br />Season: 6<br />Episode: 14<br />Anniversaries","sentiment:  94<br />Season: 6<br />Episode: 15<br />The Wall","sentiment:  98<br />Season: 6<br />Episode: 16<br />New Slogan","sentiment: 103<br />Season: 6<br />Episode: 17<br />Galentine's Day","sentiment:  73<br />Season: 6<br />Episode: 18<br />Prom","sentiment:  75<br />Season: 6<br />Episode: 19<br />Flu Season 2","sentiment:  97<br />Season: 6<br />Episode: 20<br />One in 8,000","sentiment: 101<br />Season: 6<br />Episode: 21<br />Moving Up: Part 1","sentiment: 101<br />Season: 6<br />Episode: 22<br />Moving Up: Part 2"],"type":"bar","marker":{"autocolorscale":false,"color":"rgba(165,138,255,1)","line":{"width":1.88976377952756,"color":"transparent"}},"name":"6","legendgroup":"6","showlegend":true,"xaxis":"x","yaxis":"y","hoverinfo":"text","frame":null},{"orientation":"v","width":[0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006,0.900000000000006],"base":[0,0,0,-2,0,0,0,0,0,0,0,0],"x":[113,114,115,116,117,118,119,120,121,122,123,124],"y":[74,68,28,2,57,66,80,116,53,100,71,197],"text":["sentiment:  74<br />Season: 7<br />Episode:  1<br />2017","sentiment:  68<br />Season: 7<br />Episode:  2<br />Ron & Jammy","sentiment:  28<br />Season: 7<br />Episode:  3<br />William Henry Harrison","sentiment:  -2<br />Season: 7<br />Episode:  4<br />Leslie and Ron","sentiment:  57<br />Season: 7<br />Episode:  5<br />Gryzzlbox","sentiment:  66<br />Season: 7<br />Episode:  6<br />Save JJ's","sentiment:  80<br />Season: 7<br />Episode:  7<br />Donna and Joe","sentiment: 116<br />Season: 7<br />Episode:  8<br />Ms. Ludgate-Dwyer Goes to Washington","sentiment:  53<br />Season: 7<br />Episode:  9<br />Pie-Mary","sentiment: 100<br />Season: 7<br />Episode: 10<br />The Johnny Karate Super Awesome Musical Explosion Show","sentiment:  71<br />Season: 7<br />Episode: 11<br />Two Funerals","sentiment: 197<br />Season: 7<br />Episode: 12<br />One Last Ride"],"type":"bar","marker":{"autocolorscale":false,"color":"rgba(251,97,215,1)","line":{"width":1.88976377952756,"color":"transparent"}},"name":"7","legendgroup":"7","showlegend":true,"xaxis":"x","yaxis":"y","hoverinfo":"text","frame":null}],"layout":{"margin":{"t":46.3196347031963,"r":7.30593607305936,"b":42.7397260273973,"l":43.1050228310502},"font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187},"title":{"text":"Overall Sentiment per Episode of Parks and Recreation","font":{"color":"rgba(0,0,0,1)","family":"","size":17.5342465753425},"x":0,"xref":"paper"},"xaxis":{"domain":[0,1],"automargin":true,"type":"linear","autorange":false,"range":[-5.645,130.645],"tickmode":"array","ticktext":["0","40","80","120"],"tickvals":[-8.88178419700125e-16,40,80,120],"categoryorder":"array","categoryarray":["0","40","80","120"],"nticks":null,"ticks":"","tickcolor":null,"ticklen":3.65296803652968,"tickwidth":0,"showticklabels":true,"tickfont":{"color":"rgba(77,77,77,1)","family":"","size":11.689497716895},"tickangle":-0,"showline":false,"linecolor":null,"linewidth":0,"showgrid":true,"gridcolor":"rgba(235,235,235,1)","gridwidth":0.66417600664176,"zeroline":false,"anchor":"y","title":{"text":"Episode Number","font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187}},"hoverformat":".2f"},"yaxis":{"domain":[0,1],"automargin":true,"type":"linear","autorange":false,"range":[-11.95,206.95],"tickmode":"array","ticktext":["0","50","100","150","200"],"tickvals":[0,50,100,150,200],"categoryorder":"array","categoryarray":["0","50","100","150","200"],"nticks":null,"ticks":"","tickcolor":null,"ticklen":3.65296803652968,"tickwidth":0,"showticklabels":true,"tickfont":{"color":"rgba(77,77,77,1)","family":"","size":11.689497716895},"tickangle":-0,"showline":false,"linecolor":null,"linewidth":0,"showgrid":true,"gridcolor":"rgba(235,235,235,1)","gridwidth":0.66417600664176,"zeroline":false,"anchor":"x","title":{"text":"Overall Sentiment","font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187}},"hoverformat":".2f"},"shapes":[{"type":"rect","fillcolor":null,"line":{"color":null,"width":0,"linetype":[]},"yref":"paper","xref":"paper","x0":0,"x1":1,"y0":0,"y1":1}],"showlegend":true,"legend":{"bgcolor":null,"bordercolor":null,"borderwidth":0,"font":{"color":"rgba(0,0,0,1)","family":"","size":11.689497716895},"y":1},"hovermode":"closest","barmode":"relative"},"config":{"doubleClick":"reset","showSendToCloud":false},"source":"A","attrs":{"df447df51da":{"x":{},"y":{},"fill":{},"label":{},"text":{},"type":"bar"}},"cur_data":"df447df51da","visdat":{"df447df51da":["function (y) ","x"]},"highlight":{"on":"plotly_click","persistent":false,"dynamic":false,"selectize":false,"opacityDim":0.2,"selected":{"opacity":1},"debounce":0},"shinyEvents":["plotly_hover","plotly_click","plotly_selected","plotly_relayout","plotly_brushed","plotly_brushing","plotly_clickannotation","plotly_doubleclick","plotly_deselect","plotly_afterplot","plotly_sunburstclick"],"base_url":"https://plot.ly"},"evals":[],"jsHooks":[]}</script>
+<p>Looking at this graph, I found it interesting how almost every season showed similar patterns in regards to the sentiment. Each of them started out relatively high in the first or second episode of the season. Then a few episodes in, there tended to be steep declines, as the overarching challenges of the season presented themselves. Then sentiment tended to surge in the middle of the season, followed by a second decline late in the season, before picking up as each season comes to a close. Although it doesn’t fit perfectly for every season, it is interesting to see patterns in the storytelling.</p>
+</div>
+<div id="season-imdb-scores" class="section level3">
+<h3>Season IMDB Scores</h3>
+<p>Next, I wanted to use color to represent trends within a season. This would give another representation to the graph shown above. In this graph, the user can select whether to visualize sentiment of the episodes or IMDB score.</p>
+<pre class="r"><code>g &lt;- episode_data %&gt;% 
+    filter(Season == 3) %&gt;% 
+    ggplot(aes(label = Title, x = Episode, y =1 ,fill = imdb_score,  text = description))+ 
+    geom_col(show.legend = F) +
+    scale_fill_distiller(palette = &#39;RdYlGn&#39;, direction = 0)+
+    labs(title = &#39;&#39;, x = &#39;&#39;, y = &#39;&#39;) + 
+  theme_minimal()
+
+ggplotly(g,tooltip = c( &#39;label&#39;,&#39;x&#39;,  &#39;fill&#39;))</code></pre>
+<div id="htmlwidget-2" style="width:100%;height:480px;" class="plotly html-widget"></div>
+<script type="application/json" data-for="htmlwidget-2">{"x":{"data":[{"orientation":"v","width":[0.9,0.9,0.899999999999999],"base":[0,0,0],"x":[5,6,8],"y":[1,1,1],"text":["Episode:  5<br />Title: Media Blitz<br />imdb_score: 8.1","Episode:  6<br />Title: Indianapolis<br />imdb_score: 8.1","Episode:  8<br />Title: Camping<br />imdb_score: 8.1"],"type":"bar","marker":{"autocolorscale":false,"color":"rgba(215,48,39,1)","line":{"width":1.88976377952756,"color":"transparent"}},"showlegend":false,"xaxis":"x","yaxis":"y","hoverinfo":"text","frame":null},{"orientation":"v","width":[0.9,0.9,0.899999999999999],"base":[0,0,0],"x":[1,3,15],"y":[1,1,1],"text":["Episode:  1<br />Title: Go Big or Go Home<br />imdb_score: 8.2","Episode:  3<br />Title: Time Capsule<br />imdb_score: 8.2","Episode: 15<br />Title: The Bubble<br />imdb_score: 8.2"],"type":"bar","marker":{"autocolorscale":false,"color":"rgba(238,108,68,1)","line":{"width":1.88976377952756,"color":"transparent"}},"showlegend":false,"xaxis":"x","yaxis":"y","hoverinfo":"text","frame":null},{"orientation":"v","width":0.899999999999999,"base":0,"x":[12],"y":[1],"text":"Episode: 12<br />Title: Eagleton<br />imdb_score: 8.3","type":"bar","marker":{"autocolorscale":false,"color":"rgba(254,158,99,1)","line":{"width":1.88976377952756,"color":"transparent"}},"showlegend":false,"xaxis":"x","yaxis":"y","hoverinfo":"text","frame":null},{"orientation":"v","width":[0.9,0.899999999999999,0.899999999999999],"base":[0,0,0],"x":[4,10,14],"y":[1,1,1],"text":["Episode:  4<br />Title: Ron & Tammy 2<br />imdb_score: 8.6","Episode: 10<br />Title: Soulmates<br />imdb_score: 8.6","Episode: 14<br />Title: Road Trip<br />imdb_score: 8.6"],"type":"bar","marker":{"autocolorscale":false,"color":"rgba(255,255,191,1)","line":{"width":1.88976377952756,"color":"transparent"}},"showlegend":false,"xaxis":"x","yaxis":"y","hoverinfo":"text","frame":null},{"orientation":"v","width":0.899999999999999,"base":0,"x":[11],"y":[1],"text":"Episode: 11<br />Title: Jerry's Painting<br />imdb_score: 8.7","type":"bar","marker":{"autocolorscale":false,"color":"rgba(232,245,160,1)","line":{"width":1.88976377952756,"color":"transparent"}},"showlegend":false,"xaxis":"x","yaxis":"y","hoverinfo":"text","frame":null},{"orientation":"v","width":0.9,"base":0,"x":[7],"y":[1],"text":"Episode:  7<br />Title: Harvest Festival<br />imdb_score: 8.8","type":"bar","marker":{"autocolorscale":false,"color":"rgba(203,233,130,1)","line":{"width":1.88976377952756,"color":"transparent"}},"showlegend":false,"xaxis":"x","yaxis":"y","hoverinfo":"text","frame":null},{"orientation":"v","width":[0.899999999999999,0.899999999999999],"base":[0,0],"x":[13,16],"y":[1,1],"text":["Episode: 13<br />Title: The Fight<br />imdb_score: 8.9","Episode: 16<br />Title: Li'l Sebastian<br />imdb_score: 8.9"],"type":"bar","marker":{"autocolorscale":false,"color":"rgba(160,213,105,1)","line":{"width":1.88976377952756,"color":"transparent"}},"showlegend":false,"xaxis":"x","yaxis":"y","hoverinfo":"text","frame":null},{"orientation":"v","width":0.9,"base":0,"x":[2],"y":[1],"text":"Episode:  2<br />Title: Flu Season<br />imdb_score: 9.0","type":"bar","marker":{"autocolorscale":false,"color":"rgba(106,185,90,1)","line":{"width":1.88976377952756,"color":"transparent"}},"showlegend":false,"xaxis":"x","yaxis":"y","hoverinfo":"text","frame":null},{"orientation":"v","width":0.899999999999999,"base":0,"x":[9],"y":[1],"text":"Episode:  9<br />Title: Fancy Party<br />imdb_score: 9.1","type":"bar","marker":{"autocolorscale":false,"color":"rgba(26,152,80,1)","line":{"width":1.88976377952756,"color":"transparent"}},"showlegend":false,"xaxis":"x","yaxis":"y","hoverinfo":"text","frame":null}],"layout":{"margin":{"t":26.2283105022831,"r":7.30593607305936,"b":25.5707762557078,"l":34.337899543379},"font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187},"xaxis":{"domain":[0,1],"automargin":true,"type":"linear","autorange":false,"range":[-0.245,17.245],"tickmode":"array","ticktext":["0","5","10","15"],"tickvals":[0,5,10,15],"categoryorder":"array","categoryarray":["0","5","10","15"],"nticks":null,"ticks":"","tickcolor":null,"ticklen":3.65296803652968,"tickwidth":0,"showticklabels":true,"tickfont":{"color":"rgba(77,77,77,1)","family":"","size":11.689497716895},"tickangle":-0,"showline":false,"linecolor":null,"linewidth":0,"showgrid":true,"gridcolor":"rgba(235,235,235,1)","gridwidth":0.66417600664176,"zeroline":false,"anchor":"y","title":{"text":"","font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187}},"hoverformat":".2f"},"yaxis":{"domain":[0,1],"automargin":true,"type":"linear","autorange":false,"range":[-0.05,1.05],"tickmode":"array","ticktext":["0.00","0.25","0.50","0.75","1.00"],"tickvals":[0,0.25,0.5,0.75,1],"categoryorder":"array","categoryarray":["0.00","0.25","0.50","0.75","1.00"],"nticks":null,"ticks":"","tickcolor":null,"ticklen":3.65296803652968,"tickwidth":0,"showticklabels":true,"tickfont":{"color":"rgba(77,77,77,1)","family":"","size":11.689497716895},"tickangle":-0,"showline":false,"linecolor":null,"linewidth":0,"showgrid":true,"gridcolor":"rgba(235,235,235,1)","gridwidth":0.66417600664176,"zeroline":false,"anchor":"x","title":{"text":"","font":{"color":"rgba(0,0,0,1)","family":"","size":14.6118721461187}},"hoverformat":".2f"},"shapes":[{"type":"rect","fillcolor":null,"line":{"color":null,"width":0,"linetype":[]},"yref":"paper","xref":"paper","x0":0,"x1":1,"y0":0,"y1":1}],"showlegend":false,"legend":{"bgcolor":null,"bordercolor":null,"borderwidth":0,"font":{"color":"rgba(0,0,0,1)","family":"","size":11.689497716895}},"hovermode":"closest","barmode":"relative"},"config":{"doubleClick":"reset","showSendToCloud":false},"source":"A","attrs":{"df448516977":{"x":{},"y":{},"label":{},"fill":{},"text":{},"type":"bar"}},"cur_data":"df448516977","visdat":{"df448516977":["function (y) ","x"]},"highlight":{"on":"plotly_click","persistent":false,"dynamic":false,"selectize":false,"opacityDim":0.2,"selected":{"opacity":1},"debounce":0},"shinyEvents":["plotly_hover","plotly_click","plotly_selected","plotly_relayout","plotly_brushed","plotly_brushing","plotly_clickannotation","plotly_doubleclick","plotly_deselect","plotly_afterplot","plotly_sunburstclick"],"base_url":"https://plot.ly"},"evals":[],"jsHooks":[]}</script>
+</div>
+<div id="character-sentiment" class="section level3">
+<h3>Character Sentiment</h3>
+<p>For the final graph, I used a similar “lollipop” graph to represent each character’s expression of various emotions for a given season. This measurement of emotion comes from the NRC Lexicon. Here are Chris Traeger’s emotions from Season 3:</p>
+<pre class="r"><code>all_eps_tidy %&gt;% 
+    filter(Season == 3, 
+           Character == &#39;Chris Traeger&#39;) %&gt;% 
+    inner_join(get_sentiments(&#39;nrc&#39;)) %&gt;% 
+    count(sentiment) %&gt;% 
+    ggplot(aes(x = sentiment, y = n)) +
+    geom_segment(aes(x = sentiment, xend = sentiment, y = 0, yend = n), color = &quot;#264653&quot;) + 
+    geom_point(color = &quot;#264653&quot;, size = 3, alpha = .6)+
+    scale_y_continuous()+
+    coord_flip() + 
+    labs(title =  &#39;Sentiment breakdown: Chris Traeger, Season 3&#39;, 
+         x = &#39;&#39;,
+         y = &#39;&#39;) + 
+    theme_minimal()
+## Joining, by = &quot;word&quot;</code></pre>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/sent_lollipop-1.png" width="100%" /></p>
+<p>This is an area I might flesh out and adjust if I were to continue working on this app. I found that the distributions did not vary dramatically from character to character or from season to season. To correct for that, I might consider some kind of normalization for these values, so that one’s expression of a given emotion is displayed <em>relative</em> to her peers. This would better highlight differences between characters rather than similarities based on the overall tone of the show. I might also consider using higher order <em>n</em>-grams to measure sentiment, rather than sticking to simple unigrams.</p>
+</div>
+</div>
+<div id="shiny-app" class="section level2">
+<h2>Shiny App</h2>
+<p>In this write up, I won’t get too deep into the process of constructing the Shiny app, but I will share a couple of the resources that made the styling look nice without too much manual coding of the visual elements. The main elements that I have not mentioned above consisted of text and number values, which were very simple to code and just consisted of some filtering, sorting and aggregating. Other than that, I found character photos and included them for the primary characters and many of the secondary characters.</p>
+<div id="bootstrap-lib" class="section level3">
+<h3>Bootstrap Lib</h3>
+<p>The library <code>bslib</code>, found here on <a href="https://cran.r-project.org/web/packages/bslib/index.html">CRAN</a> took care of almost all of the styling. This package implements custom Bootstrap themes for Shiny apps, and includes a preview/demo app to test out different fonts and color schemes. Thanks to this package, the custom styling took only a couple of lines of code.</p>
+</div>
+<div id="thematic" class="section level3">
+<h3>Thematic</h3>
+<p>The <code>thematic</code> library, also found on <a href="https://cran.r-project.org/web/packages/thematic/index.html">CRAN</a>, covers some of the styling “gaps” left by <code>bslib</code>. For example, <code>bslib</code> is not useful for styling base R and <code>ggplot</code> graphs, as those are rendered as image files. Further, <code>bslib</code> also has limited effectiveness (for now) with styling <code>plotly</code> widgets. Thematic took care of those issues, applying custom styling to plots as they are generated. This can be used to create graphics that fit with the other theming elements in the Shiny app. An added bonus of <code>thematic</code> is that running <code>thematic_on()</code> during an R session adjusts the plots you create to match your RStudio editor theme. Perfect for maintaining the right aesthetic while doing EDA.</p>
+</div>
+</div>
+<div id="conclusion" class="section level2">
+<h2>Conclusion</h2>
+<p>Overall, I did not expect to put as much time into this project as I did. When I take on new projects, my intent is always to familiarize myself with tools and concepts I haven’t used much in the past. This project, for example, was my first go at web scraping. I learned about <code>thematic</code> and <code>bslib</code> during a webinar at <code>rstudio::global</code> recently, and had no experience with those packages before this project. I also didn’t have much experience with sentiment analysis, so even this basic work in that realm was new and exciting. I am planning to return to sentiment analysis soon to do something more in depth on the analysis side without developing a Shiny app. If you enjoyed seeing the Shiny app or reading about how it came together, feel free to reach out to me with any comments or questions!</p>
 </div>
