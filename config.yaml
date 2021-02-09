@@ -52,7 +52,7 @@ menu:
       name: About
       url: /about/
       weight: 300
-    - identifier: contact
-      name: Contact
-      url: /contact/
+    - identifier: resume
+      name: Resume
+      url: /resume/
       weight: 400
