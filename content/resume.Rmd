@@ -1,0 +1,67 @@
+---
+title: "Resume"
+author: 'Wade Mouer'
+date: 2021-02-03T11:00:23-05:00
+draft: true
+---
+
+## Overview
+
+I am a curious, creative, and independent thinker, I am a helpful and thoughtful teammate, I
+take ownership and accountability for deliverables, and I take pride in finding and communicating meaningful insights from data.
+
+## Projects
+
+### *Parks and Recreation* Sentiment Analysis R Shiny App (2021)
+
+-   Used dialogue data from the sitcom *Parks and Recreation* to explore character/show sentiment development over the series run
+
+-   Incorporated web scraping of the IMDB webpage to provide additional context
+
+-   Organized components into an interactive and visually appealing R Shiny application
+
+### Practicum: Wounded Warrior Project's "Warriors to Work" Employment Program (2020-21)
+
+-   Identify insights on successful Veteran employment associated with Veteran engagement in programs, physical/mental health, and additional metrics
+
+-   Measure the employment readiness of Veterans by building a model based on individual profiles
+
+-   Utilize R, Python, SAS, and GitLab throughout the project lifecycle for data preprocessing, project management, modeling and displaying results
+
+### Mathematics Association of America's Preparation for Industrial Careers in Math
+
+-   Partnered with a nonprofit residential substance abuse treatment program to enhance transportation logistics while alleviating administrative burden
+
+-   Developed a routing and scheduling tool based on Google's OR Tools Python package to determine optimal routes for a fleet of vans to transport residents to and from appointments
+
+## Skills
+
+-   R: tidyverse, dplyr, ggplot, forecast, mlr, ranger, h2o, summarytools, tidymodels, survival, tidytext, shiny, shinydashboards, rmarkdown, blogdown
+
+-   Python: pandas, numpy, scipy, matplotlib, plotly, sklearn, statsmodels
+
+-   SQL, SAS (Certified Specialist), Tableau (Certified Desktop Specialist), Git/GitHub
+
+## Education
+
+### Institute for Advanced Analytics - Raleigh, NC - Master of Science in Analytics (2021)
+
+-   Extensive coursework in statistical techniques, including regression, time series analysis, data mining, text analytics, machine learning, optimization, and others
+
+-   Eight-month Practicum project in team of five with an industry sponsor using real-world data
+
+### University of North Carolina-Asheville - Asheville, NC - Bachelor of Arts in Mathematics (2020)
+
+-   Graduated *summa cum laude*, with distinction in Mathematics
+
+-   Coursework in real analysis, linear and abstract algebra, numerical analysis, differential equations, algorithms, data structures, software engineering, and others
+
+## Work Experience
+
+### Server, Olive Garden (Oct. 2019 - Mar. 2020)
+
+-   Developed teamwork, communication, time management and multitasking skills
+
+### Research Assistant, University of North Carolina-Asheville (May 2019 - Aug. 2019)
+
+-   Implemented numerical methods for solving differential equations in a research project modeling ATP Synthase
